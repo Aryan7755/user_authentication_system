@@ -1,0 +1,3 @@
+#development version of configurations
+spring:
+  port: 8083

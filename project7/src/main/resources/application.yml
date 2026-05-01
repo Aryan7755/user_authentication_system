@@ -1,6 +1,6 @@
 spring:
   application:
-    name=project7:
+    name: project7
   profiles:
     active: dev
   datasource:

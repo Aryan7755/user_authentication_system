@@ -23,7 +23,7 @@ public class User {
     private String name;
     @Column(name = "user_email",unique = true,length = 300)
     private String email;
-    @Column(nullable = false)
+
     private String password;
 
     private String image;

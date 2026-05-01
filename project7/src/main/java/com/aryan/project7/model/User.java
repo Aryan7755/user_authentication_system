@@ -16,11 +16,12 @@ import java.util.*;
 @AllArgsConstructor
 public class User {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    @Column(unique = true, nullable = false)
-    private String username;
-    @Column(unique = true, nullable = false)
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "user_id")
+    private UUID id;
+    @Column(name = "user_name",length = 500)
+    private String name;
+    @Column(name = "user_email",unique = true,length = 300)
     private String email;
     @Column(nullable = false)
     private String password;

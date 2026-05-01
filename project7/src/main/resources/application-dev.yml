@@ -3,4 +3,21 @@ server:
   port: 8083
 
 spring:
-  port: 8083
+  application:
+    name: project7
+
+  #databse config
+  datasource:
+    url: jdbc:mysql://localhost:3306/auth_db?createDatabaseIfNotExist=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD}
+
+  #jpa , hibernate config
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format-sql: true
+    show-sql: true

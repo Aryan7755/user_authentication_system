@@ -25,6 +25,11 @@ public class User {
     private String email;
     @Column(nullable = false)
     private String password;
+
+    private String image;
+    private boolean enabled = true;
+    private Instant createdAt=Instant.now();
+    private Instant updatedAt=Instant.now();
     @Enumerated(EnumType.STRING)
     private Role role;
 }

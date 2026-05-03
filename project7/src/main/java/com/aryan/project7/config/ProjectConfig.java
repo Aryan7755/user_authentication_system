@@ -1,0 +1,14 @@
+package com.aryan.project7.config;
+
+import org.modelmapper.ModelMapper;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class ProjectConfig {
+
+    @Bean
+    public ModelMapper modelMapper(){
+        return new ModelMapper();
+    }
+}

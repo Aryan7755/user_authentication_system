@@ -1,7 +1,6 @@
 package com.aryan.project7.dtos;
 
-import com.aryan.project7.model.Provider;
-import com.aryan.project7.model.Role;
+import com.aryan.project7.entity.Provider;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

@@ -1,15 +1,15 @@
-package com.aryan.project7.service;
+package com.aryan.project7.service.Impl;
 
 import com.aryan.project7.dtos.UserDto;
 import com.aryan.project7.exception.ResourceNotFoundException;
 import com.aryan.project7.helper.UserHelper;
-import com.aryan.project7.model.Provider;
-import com.aryan.project7.model.User;
+import com.aryan.project7.entity.Provider;
+import com.aryan.project7.entity.User;
 import com.aryan.project7.repository.UserRepository;
+import com.aryan.project7.service.UserService;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
 import org.modelmapper.ModelMapper;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -17,7 +17,7 @@ import java.util.UUID;
 
 @Service
 @AllArgsConstructor
-public class UserServiceImpl implements UserService{
+public class UserServiceImpl implements UserService {
 
 
     private final UserRepository userRepository;

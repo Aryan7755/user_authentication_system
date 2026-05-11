@@ -1,6 +1,6 @@
 package com.aryan.project7.repository;
 
-import com.aryan.project7.model.User;
+import com.aryan.project7.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import java.util.Optional;

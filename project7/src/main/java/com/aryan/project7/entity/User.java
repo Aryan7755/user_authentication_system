@@ -1,14 +1,12 @@
-package com.aryan.project7.model;
+package com.aryan.project7.entity;
 
 import jakarta.persistence.*;
-import jakarta.persistence.criteria.CriteriaBuilder;
 import lombok.*;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.time.Instant;
-import java.time.InstantSource;
 import java.util.*;
 
 @Entity

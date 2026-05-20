@@ -1,0 +1,3 @@
+#qa or testing version of configurations
+spring:
+  port: 8081

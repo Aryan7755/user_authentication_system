@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: project7
+  profiles:
+    active: dev
+  datasource:
+    # The 'createDatabaseIfNotExist' flag is a lifesaver during initial setup!
+    url: jdbc:mysql://localhost:3306/auth_db?createDatabaseIfNotExist=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      # 'update' is perfect for dev; it modifies your schema as you change your @Entity classes
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  spring:
+    threads:
+      virtual:
+        enabled: true
+
+server:
+  port: 8082 # Moving off 8080 is smart to avoid port conflicts with other tools
+
+

@@ -1,0 +1,65 @@
+# Development version of configurations
+server:
+  port: 8083
+
+spring:
+  application:
+    name: project7
+
+  # Database configuration
+  datasource:
+    url: jdbc:mysql://localhost:3306/auth_db?createDatabaseIfNotExist=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  # JPA & Hibernate configuration
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+    show-sql: true
+
+  # OAuth2 Client configuration
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:test-client-id}
+            client-secret: ${GOOGLE_CLIENT_SECRET:test-client-secret}
+            scope:
+              - email
+              - profile
+              - openid
+          github:
+            client-id: ${GITHUB_CLIENT_ID:test-client-id}
+            client-secret: ${GITHUB_CLIENT_SECRET:test-client-secret}
+            # Fixed: Changed '(' to '/' and ensured matching curly braces
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            scope:
+              - user:email
+              - read:user
+
+# Custom Security Properties (for JwtService & CookieService)
+security:
+  jwt:
+    secret: ${JWT_SECRET:this_is_a_super_long_and_very_secure_secret_key_that_is_at_least_64_characters_long_for_hs512_security}
+    issuer: ${JWT_ISSUER:api.substring.com}
+    access-ttl-seconds: ${JWT_ACCESS_TTL_SECONDS:3600}
+    refresh-ttl-seconds: ${JWT_REFRESH_TTL_SECONDS:86400}
+    refresh-token-cookie-name: ${JWT_REFRESH_COOKIE_NAME:refreshToken}
+    cookie-secure: ${JWT_COOKIE_SECURE:false} # Set to false for local HTTP development
+    cookie-http-only: ${JWT_COOKIE_ONLY:true}
+    cookie-same-site: ${JWT_COOKIE_SAME_SITE:lax}
+    cookie-domain: ${JWT_COOKIE_DOMAIN:localhost}
+
+# Frontend Redirection Properties
+app:
+  auth:
+    frontend:
+      success-redirect: http://localhost:5173/auth/success
+      failure-redirect: http://localhost:5173/auth/failure

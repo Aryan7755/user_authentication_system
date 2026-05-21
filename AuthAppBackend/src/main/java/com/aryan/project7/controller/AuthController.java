@@ -212,7 +212,11 @@ public class AuthController {
 
     // Creating a new account
     @PostMapping("/register")
-    public ResponseEntity<UserDto> registerUser(@RequestBody UserDto userDto) {
+    public ResponseEntity<UserDto> registerUser(@Valid @RequestBody UserRegisterDto userDto) {
+        UserDto dto = new UserDto();
+        dto.setName(userDto.name());
+        dto.setEmail(userDto.email());
+        dto.setPassword(userDto.password());
         return ResponseEntity.status(HttpStatus.CREATED).body(authService.registerUser(userDto));
     }
 }

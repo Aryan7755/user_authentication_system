@@ -1,6 +1,34 @@
+# === IDE ===
 .idea/
-target/
-node_modules/
-dist/
-build/
-.env
+.vscode/
+*.iml
+*.iws
+*.ipr
+*.xml       # Catches vcs.xml, workspace.xml, etc.
+*.swp
+*.swo
+
+# === BACKEND ===
+AuthAppBackend/target/
+AuthAppBackend/.mvn/wrapper/maven-wrapper.jar
+AuthAppBackend/application-local.yml
+AuthAppBackend/application-*.local.yml
+AuthAppBackend/.env
+AuthAppBackend/.env.local
+
+# === FRONTEND ===
+AuthAppFrontend/node_modules/
+AuthAppFrontend/dist/
+AuthAppFrontend/dist-ssr/
+AuthAppFrontend/.env.local
+
+# === GENERATED FILES ===
+HELP.md
+
+# === OS ===
+.DS_Store
+Thumbs.db
+
+# === LOGS ===
+*.log
+*.log.*

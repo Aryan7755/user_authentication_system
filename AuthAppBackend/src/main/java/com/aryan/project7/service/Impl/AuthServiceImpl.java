@@ -26,4 +26,6 @@ public class AuthServiceImpl implements AuthService {
         // Now that the password is safe, we hand it off to the regular user service to save it
         return userService.createUser(userDto);
     }
+    //This method nulls the hashed password before sending dtos through endpoints
+
 }

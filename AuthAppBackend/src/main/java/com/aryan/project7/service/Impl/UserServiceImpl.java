@@ -1,5 +1,6 @@
 package com.aryan.project7.service.Impl;
 
+import com.aryan.project7.config.ValidationMessages;
 import com.aryan.project7.dtos.UserDto;
 import com.aryan.project7.exception.ResourceNotFoundException;
 import com.aryan.project7.helper.UserHelper;
@@ -10,6 +11,7 @@ import com.aryan.project7.service.UserService;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
 import org.modelmapper.ModelMapper;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -29,12 +31,12 @@ public class UserServiceImpl implements UserService {
     public UserDto createUser(UserDto userDto) {
         // We can't have a user without an email—that's our main way of identifying them
         if(userDto.getEmail() == null || userDto.getEmail().isBlank()){
-            throw new IllegalArgumentException("Email is required");
+            throw new IllegalArgumentException(ValidationMessages.EMAIL_REQUIRED);
         }
 
         // Double-check they aren't already in the system so we don't get duplicates
         if(userRepository.existsByEmail(userDto.getEmail())){
-            throw new IllegalArgumentException("User with this email already exists");
+            throw new IllegalArgumentException(ValidationMessages.EMAIL_ALREADY_EXISTS);
         }
 
         // Map the DTO over to our Entity so JPA can handle it

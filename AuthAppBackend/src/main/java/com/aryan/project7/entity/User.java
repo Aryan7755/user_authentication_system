@@ -49,7 +49,7 @@ public class User implements UserDetails {
 
     // We use EAGER here because we almost always need the user's roles
     // the moment they log in to check their permissions.
-    @ManyToMany(fetch = FetchType.EAGER)
+    @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "user_roles",
             joinColumns  = @JoinColumn(name="user_id"),
             inverseJoinColumns = @JoinColumn(name = "role_id"))

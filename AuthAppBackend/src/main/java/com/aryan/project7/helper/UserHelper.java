@@ -6,9 +6,14 @@ import java.util.UUID;
 public class UserHelper {
 
     // Converts a standard String ID into a UUID object that JPA and Postgres love
-    public static UUID parseUUID(String uId){
-        // Tip: You might want to wrap this in a try-catch later to throw a
-        // ResourceNotFound or BadRequest if the string isn't a valid UUID!
-        return UUID.fromString(uId);
+    public static UUID parseUUID(String uId) {
+        if (uId == null || uId.isBlank()) {
+            throw new IllegalArgumentException("User ID cannot be null or empty");
+        }
+        try {
+            return UUID.fromString(uId);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid UUID format: " + uId, e);
+        }
     }
 }

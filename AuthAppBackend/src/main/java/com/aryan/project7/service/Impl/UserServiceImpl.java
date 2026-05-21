@@ -77,7 +77,12 @@ public class UserServiceImpl implements UserService {
 
         // TODO: This password logic needs a second look later to make sure we hash it correctly here too!
         if(userDto.getPassword() != null && !userDto.getPassword().isBlank()) {
-            existingUser.setPassword(passwordEncoder.encode(userDto.getPassword()));
+            // Only encode if it doesn't look like a hash (BCrypt starts with $2a$, $2b$, $2y$)
+            String pwd = userDto.getPassword();
+            if (!pwd.startsWith("$2") && !pwd.startsWith("$y$")) {
+                existingUser.setPassword(passwordEncoder.encode(pwd));
+            }
+            //existingUser.setPassword(passwordEncoder.encode(userDto.getPassword()));
         }
 
         User updatedUser = userRepository.save(existingUser);
@@ -107,6 +112,7 @@ public class UserServiceImpl implements UserService {
     public Iterable<UserDto> getAllUsers() {
         return userRepository.findAll()
                 .stream()
+                .peek(user -> user.getRoles().size())
                 .map(user -> modelMapper.map(user, UserDto.class))
                 .toList();
     }

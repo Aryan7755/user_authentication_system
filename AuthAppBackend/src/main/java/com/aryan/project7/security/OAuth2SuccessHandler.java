@@ -56,6 +56,9 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
             case "google" -> {
                 String googleId = oAuth2User.getAttribute("sub");
                 String email = oAuth2User.getAttribute("email");
+                if (email == null || email.isBlank()) {
+                    throw new RuntimeException("Google account missing email. Contact support.");
+                }
                 String name = oAuth2User.getAttribute("name");
                 String picture = oAuth2User.getAttribute("picture");
 

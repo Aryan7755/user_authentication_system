@@ -81,11 +81,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             });
 
         } catch (ExpiredJwtException e) {
-            request.setAttribute("error", "Token Expired");
+            request.setAttribute("error", "Token has expired");
         } catch (MalformedJwtException e) {
-            request.setAttribute("error", "Invalid Token");
+            request.setAttribute("error", "Invalid token format");
+        } catch (SignatureException e) {
+            request.setAttribute("error", "Token signature invalid");
+        } catch (JwtException e) {
+            request.setAttribute("error", "Token validation failed");
         } catch (Exception e) {
-            request.setAttribute("error", "Authentication Failed");
+            logger.error("Unexpected error in JWT filter", e);
+            request.setAttribute("error", "Authentication error");
         }
 
         filterChain.doFilter(request, response);

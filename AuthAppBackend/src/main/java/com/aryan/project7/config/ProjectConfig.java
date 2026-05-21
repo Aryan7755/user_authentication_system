@@ -3,6 +3,11 @@ package com.aryan.project7.config;
 import org.modelmapper.ModelMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.Arrays;
 
 // This class is just our general setup for various tools used across the app
 @Configuration
@@ -14,4 +19,5 @@ public class ProjectConfig {
     public ModelMapper modelMapper(){
         return new ModelMapper();
     }
+
 }

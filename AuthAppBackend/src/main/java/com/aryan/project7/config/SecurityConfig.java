@@ -2,6 +2,7 @@ package com.aryan.project7.config;
 
 import com.aryan.project7.dtos.ApiError;
 import com.aryan.project7.security.JwtAuthenticationFilter;
+import com.aryan.project7.security.OAuth2FailureHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,11 +26,13 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final AuthenticationSuccessHandler authenticationSuccessHandler;
+    private final OAuth2FailureHandler oauth2FailureHandler;
 
     // Standard constructor injection for our filter and success handler
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter, AuthenticationSuccessHandler authenticationSuccessHandler) {
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter, AuthenticationSuccessHandler authenticationSuccessHandler, OAuth2FailureHandler oauth2FailureHandler) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.authenticationSuccessHandler = authenticationSuccessHandler;
+        this.oauth2FailureHandler = oauth2FailureHandler;
     }
 
     @Bean
@@ -52,7 +55,7 @@ public class SecurityConfig {
                 // Handling social logins (Google, GitHub, etc.)
                 .oauth2Login(oauth2 -> oauth2
                         .successHandler(authenticationSuccessHandler)
-                        .failureHandler(null)) // You might want to add a failure handler here later!
+                        .failureHandler(oauth2FailureHandler))
 
                 .logout(AbstractHttpConfigurer::disable)
 

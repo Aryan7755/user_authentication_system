@@ -4,7 +4,6 @@
 *.iml
 *.iws
 *.ipr
-*.xml       # Catches vcs.xml, workspace.xml, etc.
 *.swp
 *.swo
 
@@ -15,15 +14,13 @@ AuthAppBackend/application-local.yml
 AuthAppBackend/application-*.local.yml
 AuthAppBackend/.env
 AuthAppBackend/.env.local
+AuthAppBackend/HELP.md
 
 # === FRONTEND ===
 AuthAppFrontend/node_modules/
 AuthAppFrontend/dist/
 AuthAppFrontend/dist-ssr/
 AuthAppFrontend/.env.local
-
-# === GENERATED FILES ===
-HELP.md
 
 # === OS ===
 .DS_Store

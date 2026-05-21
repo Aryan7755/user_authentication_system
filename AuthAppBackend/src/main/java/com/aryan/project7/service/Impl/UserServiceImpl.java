@@ -21,6 +21,7 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final ModelMapper modelMapper;
+    private final PasswordEncoder passwordEncoder;
 
     // This handles the heavy lifting of onboarding a new user
     @Override
@@ -73,7 +74,9 @@ public class UserServiceImpl implements UserService {
         existingUser.setUpdatedAt(Instant.now());
 
         // TODO: This password logic needs a second look later to make sure we hash it correctly here too!
-        if(userDto.getPassword() != null) existingUser.setPassword(userDto.getPassword());
+        if(userDto.getPassword() != null && !userDto.getPassword().isBlank()) {
+            existingUser.setPassword(passwordEncoder.encode(userDto.getPassword()));
+        }
 
         User updatedUser = userRepository.save(existingUser);
         return modelMapper.map(updatedUser, UserDto.class);

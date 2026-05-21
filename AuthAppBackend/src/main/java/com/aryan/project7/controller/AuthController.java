@@ -1,6 +1,7 @@
 package com.aryan.project7.controller;
 
 import com.aryan.project7.dtos.LoginRequest;
+import com.aryan.project7.dtos.UserRegisterDto;
 import com.aryan.project7.dtos.RefreshTokenRequest;
 import com.aryan.project7.dtos.TokenResponse;
 import com.aryan.project7.dtos.UserDto;
@@ -12,9 +13,12 @@ import com.aryan.project7.security.CookieService;
 import com.aryan.project7.security.JwtService;
 import com.aryan.project7.service.AuthService;
 import io.jsonwebtoken.JwtException;
+
+
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.http.HttpHeaders;
@@ -217,6 +221,6 @@ public class AuthController {
         dto.setName(userDto.name());
         dto.setEmail(userDto.email());
         dto.setPassword(userDto.password());
-        return ResponseEntity.status(HttpStatus.CREATED).body(authService.registerUser(userDto));
+        return ResponseEntity.status(HttpStatus.CREATED).body(authService.registerUser(dto));
     }
 }

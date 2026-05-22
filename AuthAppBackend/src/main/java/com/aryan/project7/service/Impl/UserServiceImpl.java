@@ -47,8 +47,10 @@ public class UserServiceImpl implements UserService {
 
         User savedUser = userRepository.save(user);
 
-        // Send back the saved user as a DTO (best practice: never return the Entity itself)
-        return modelMapper.map(savedUser, UserDto.class);
+        UserDto responseDto = modelMapper.map(savedUser, UserDto.class);
+        responseDto.setPassword(null);
+
+        return responseDto;
     }
 
     // Quick lookup by email—handy for the login flow
@@ -57,7 +59,9 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not present with given Email id"));
 
-        return modelMapper.map(user, UserDto.class);
+        UserDto dto = modelMapper.map(user, UserDto.class);
+        dto.setPassword(null);
+        return dto;
     }
 
     // Updates an existing user's profile
@@ -86,7 +90,9 @@ public class UserServiceImpl implements UserService {
         }
 
         User updatedUser = userRepository.save(existingUser);
-        return modelMapper.map(updatedUser, UserDto.class);
+        UserDto dto = modelMapper.map(updatedUser, UserDto.class);
+        dto.setPassword(null);  // ← ADD THIS
+        return dto;
     }
 
     // Wipes a user from the database
@@ -103,7 +109,9 @@ public class UserServiceImpl implements UserService {
     public UserDto getUserById(String userId) {
         User user = userRepository.findById(UserHelper.parseUUID(userId))
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with the given Id"));
-        return modelMapper.map(user, UserDto.class);
+        UserDto dto = modelMapper.map(user, UserDto.class);
+        dto.setPassword(null);  // ← ADD THIS
+        return dto;
     }
 
     // Grabs every user—usually just for admin dashboards
@@ -113,7 +121,11 @@ public class UserServiceImpl implements UserService {
         return userRepository.findAll()
                 .stream()
                 .peek(user -> user.getRoles().size())
-                .map(user -> modelMapper.map(user, UserDto.class))
+                .map(user -> {
+                    UserDto dto = modelMapper.map(user, UserDto.class);
+                    dto.setPassword(null);  // ← ADD THIS
+                    return dto;
+                })
                 .toList();
     }
 }

@@ -31,6 +31,7 @@ public class RefreshToken {
 
     // The user who owns this token. We use LAZY fetch so we don't grab user data unless we actually need it.
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
     private User user;
 
     @Column(updatable = false, nullable = false)

@@ -1,11 +1,17 @@
 package com.aryan.project7.controller;
 
 import com.aryan.project7.dtos.UserDto;
+import com.aryan.project7.repository.RefreshTokenRepo;
+import com.aryan.project7.repository.UserRepository;
 import com.aryan.project7.service.UserService;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -13,12 +19,22 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
     private final UserService userService;
+    private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenRepo refreshTokenRepo;
+    private final UserRepository userRepository;
 
-    // Creates a brand new user from scratch
+
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<UserDto> createUser(@RequestBody UserDto userDto){
+
+        // Hash the password right away, just like AuthController does
+        String encodedPassword = passwordEncoder.encode(userDto.getPassword());
+        userDto.setPassword(encodedPassword);
+
         return ResponseEntity.status(HttpStatus.CREATED).body(userService.createUser(userDto));
     }
+
 
     // Grab everyone in the database
     @GetMapping
@@ -39,6 +55,7 @@ public class UserController {
     }
 
     // Wipe a user from the system based on their ID
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{userId}")
     public void deleteUserById(@PathVariable String userId){
         userService.deleteUser(userId);
@@ -47,6 +64,7 @@ public class UserController {
     // Update an existing user's details—we take the ID from the URL and the new data from the body
     @PutMapping("/{userId}")
     public ResponseEntity<UserDto> updateUserById(@RequestBody UserDto userDto, @PathVariable String userId){
+
         return ResponseEntity.ok(userService.updateUser(userDto, userId));
     }
 }

@@ -72,8 +72,10 @@ public class User implements UserDetails {
     // This converts our Role entities into the format Spring Security understands
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return roles.stream()
-                .map(role -> new SimpleGrantedAuthority(role.getName()))
+        // We map each Role entity in the set to a SimpleGrantedAuthority.
+        // Make sure your Role entity has a getter for its name, like getName() or getRoleName()
+        return this.roles.stream()
+                .map(role -> new SimpleGrantedAuthority("ROLE_" + role.getName()))
                 .toList();
     }
 
@@ -98,5 +100,9 @@ public class User implements UserDetails {
     @Override
     public boolean isCredentialsNonExpired() {
         return true;
+    }
+    @Override
+    public boolean isEnabled() {
+        return this.enabled;  // ← ADD THIS
     }
 }

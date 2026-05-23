@@ -30,10 +30,8 @@ import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
 import java.util.Arrays;
@@ -52,15 +50,30 @@ public class AuthController {
     private final JwtService jwtService;
     private final ModelMapper modelMapper;
     private final CookieService cookieService;
+    private final PasswordEncoder passwordEncoder;
 
     // This is the front door. We check credentials and hand out keys (tokens).
     @PostMapping("/login")
-    public ResponseEntity<TokenResponse> login(@RequestBody LoginRequest loginRequest, HttpServletResponse response) {
+    public ResponseEntity<TokenResponse> login(@Valid@RequestBody LoginRequest loginRequest, HttpServletResponse response) {
+        System.out.println("LOGIN HIT");
+        System.out.println(loginRequest.email());
+        System.out.println(loginRequest.password());
+
+        User user = userRepository.findByEmail(loginRequest.email()).orElse(null);
+
+        System.out.println(user.getPassword());
+        System.out.println(user.getPassword().length());
+
+        System.out.println(passwordEncoder.matches(
+                loginRequest.password(),
+                user.getPassword()
+        ));
+
         // First, make sure they actually are who they say they are
         authenticate(loginRequest);
 
-        User user = userRepository.findByEmail(loginRequest.email())
-                .orElseThrow(() -> new BadCredentialsException("Invalid Username or Password"));
+        //User user = userRepository.findByEmail(loginRequest.email())
+         //       .orElseThrow(() -> new BadCredentialsException("Invalid Username or Password"));
 
         if (!user.isEnabled()) {
             throw new DisabledException("User is Disabled");
@@ -94,6 +107,7 @@ public class AuthController {
         try {
             return authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(loginRequest.email(), loginRequest.password()));
         } catch (Exception e) {
+            e.printStackTrace();
             throw new BadCredentialsException("Invalid Username or Password");
         }
     }

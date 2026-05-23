@@ -52,24 +52,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 return;
             }
 
-            // In JJWT 0.13.0, parsing returns Jws<Claims>
+            // Parse token
             Jws<Claims> jwsClaims = jwtService.parse(token);
             Claims payload = jwsClaims.getPayload();
             String userId = payload.getSubject();
             UUID userUuid = UserHelper.parseUUID(userId);
 
+            // Look up the user
             userRepository.findById(userUuid).ifPresent(user -> {
                 if (user.isEnabled()) {
-                    List<GrantedAuthority> authorities = user.getRoles() == null ?
-                            List.of() :
-                            user.getRoles().stream()
-                                    .map(role -> new SimpleGrantedAuthority(role.getName()))
-                                    .collect(Collectors.toList());
-
+                    // FIX: Pass the entire User object as the principal, and use its built-in authorities
                     UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                            user.getEmail(),
+                            user,
                             null,
-                            authorities
+                            user.getAuthorities() // This now correctly includes the "ROLE_" prefix!
                     );
 
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

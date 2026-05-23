@@ -11,6 +11,7 @@ public class AppConstants {
             // Swagger and API docs—super helpful for testing so we keep them open
             "/v3/api-docs/**",
             "/swagger-ui.html",
-            "/swagger-ui/**"
+            "/swagger-ui/**",
+            "/error"
     };
 }

@@ -1,6 +1,7 @@
 package com.aryan.project7.repository;
 
 import com.aryan.project7.entity.User;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import java.util.Optional;
@@ -17,5 +18,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     // Super handy for the registration flow—it lets us check if an email is
     // already taken before we try to create a new account
     boolean existsByEmail(String email);
+
+    @EntityGraph(attributePaths = "roles")
+    Optional<User> findById(UUID id);
 
 }

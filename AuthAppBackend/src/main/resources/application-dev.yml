@@ -29,20 +29,13 @@ spring:
       client:
         registration:
           google:
-            client-id: ${GOOGLE_CLIENT_ID:test-client-id}
-            client-secret: ${GOOGLE_CLIENT_SECRET:test-client-secret}
-            scope:
-              - email
-              - profile
-              - openid
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            scope: profile, email
           github:
-            client-id: ${GITHUB_CLIENT_ID:test-client-id}
-            client-secret: ${GITHUB_CLIENT_SECRET:test-client-secret}
-            # Fixed: Changed '(' to '/' and ensured matching curly braces
-            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
-            scope:
-              - user:email
-              - read:user
+            client-id: ${GITHUB_CLIENT_ID}
+            client-secret: ${GITHUB_CLIENT_SECRET}
+            scope: read:user, user:email
 
 # Custom Security Properties (for JwtService & CookieService)
 security:

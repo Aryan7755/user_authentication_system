@@ -17,6 +17,7 @@ import org.springframework.security.oauth2.client.authentication.OAuth2Authentic
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -26,6 +27,7 @@ import java.util.UUID;
 // Its job is to save the user to our DB if they're new and hand out our own JWTs.
 @Component
 @RequiredArgsConstructor
+@Transactional
 public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
@@ -75,12 +77,16 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
                 userEntity = userRepository.findByEmail(email).orElseGet(() -> userRepository.save(newUser));
             }
             case "github" -> {
-                String githubId = String.valueOf(oAuth2User.getAttribute("id"));
+                // Safely retrieve the ID object
+                Object idObj = oAuth2User.getAttribute("id");
+
+                // Convert to String regardless of whether it's an Integer, Long, or String
+                String githubId = (idObj != null) ? idObj.toString() : null;
+
                 String email = oAuth2User.getAttribute("email");
-                String name = oAuth2User.getAttribute("login"); // GitHub uses 'login' for username
+                String name = oAuth2User.getAttribute("login");
                 String image = oAuth2User.getAttribute("avatar_url");
 
-                // GitHub users sometimes have private emails, so we create a fallback
                 if (email == null) {
                     email = name + "@github.com";
                 }
@@ -90,7 +96,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
                         .name(name)
                         .image(image)
                         .enabled(true)
-                        .provider(Provider.GITHUB) // Fixed: was Google in the original!
+                        .provider(Provider.GITHUB)
                         .providerId(githubId)
                         .build();
 
@@ -114,11 +120,22 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         // Generate the JWTs
         String refreshToken = jwtService.generateRefreshToken(userEntity, jti);
 
+        // --- NEW LINE: Generate the Access Token ---
+        String accessToken = jwtService.generateAccessToken(userEntity);
+
         // Stick the refresh token in a secure cookie
         cookieService.attachRefreshCookie(response, refreshToken, (int) jwtService.getRefreshTtlSeconds());
 
-        // Send the user back to the frontend (e.g., your React/Angular dashboard)
         logger.info("User {} is logged in. Redirecting to frontend...", userEntity.getEmail());
-        response.sendRedirect(frontendSuccessUrl);
+
+        // --- NEW LOGIC: Attach the Access Token to the URL safely ---
+        String finalRedirectUrl = org.springframework.web.util.UriComponentsBuilder
+                .fromUriString(frontendSuccessUrl)
+                .queryParam("token", accessToken)
+                .build().toUriString();
+
+        // Send the user back to the frontend (e.g., your React/Angular dashboard)
+        response.sendRedirect(finalRedirectUrl);
+
     }
 }

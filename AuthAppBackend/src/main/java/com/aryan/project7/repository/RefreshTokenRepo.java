@@ -16,4 +16,6 @@ public interface RefreshTokenRepo extends JpaRepository<RefreshToken, UUID> {
     Optional<RefreshToken> findByJti(String jti);
     @Query("DELETE FROM RefreshToken r WHERE r.expiresAt < CURRENT_TIMESTAMP OR r.revoked = true")
     void cleanupExpiredTokens();
+
+    void deleteByUser_Id(UUID userId);
 }

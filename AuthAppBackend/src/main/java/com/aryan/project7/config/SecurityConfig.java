@@ -1,9 +1,11 @@
 package com.aryan.project7.config;
 
 import com.aryan.project7.dtos.ApiError;
+import com.aryan.project7.repository.RefreshTokenRepo;
 import com.aryan.project7.security.CustomUserDetailService;
 import com.aryan.project7.security.JwtAuthenticationFilter;
 import com.aryan.project7.security.OAuth2FailureHandler;
+import com.aryan.project7.security.RefreshTokenFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -36,12 +38,14 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final AuthenticationSuccessHandler authenticationSuccessHandler;
     private final OAuth2FailureHandler oauth2FailureHandler;
+    private final RefreshTokenFilter  refreshTokenFilter;
 
     // Standard constructor injection for our filter and success handler
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter, AuthenticationSuccessHandler authenticationSuccessHandler, OAuth2FailureHandler oauth2FailureHandler) {
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter, AuthenticationSuccessHandler authenticationSuccessHandler, OAuth2FailureHandler oauth2FailureHandler, RefreshTokenFilter refreshTokenFilter) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.authenticationSuccessHandler = authenticationSuccessHandler;
         this.oauth2FailureHandler = oauth2FailureHandler;
+        this.refreshTokenFilter = refreshTokenFilter;
     }
 
     @Bean
@@ -123,8 +127,10 @@ public class SecurityConfig {
                 }))
 
                 // We need to run our JWT check BEFORE the standard username/password check
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-
+                // ... inside securityFilterChain
+                // runs first
+                .addFilterBefore(refreshTokenFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(jwtAuthenticationFilter, RefreshTokenFilter.class); // Refresh token
         return httpSecurity.build();
     }
 

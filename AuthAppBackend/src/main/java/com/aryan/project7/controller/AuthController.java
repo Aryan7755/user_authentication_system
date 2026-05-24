@@ -6,7 +6,9 @@ import com.aryan.project7.dtos.RefreshTokenRequest;
 import com.aryan.project7.dtos.TokenResponse;
 import com.aryan.project7.dtos.UserDto;
 import com.aryan.project7.entity.RefreshToken;
+import com.aryan.project7.entity.RefreshTokenRedis;
 import com.aryan.project7.entity.User;
+import com.aryan.project7.repository.RefreshTokenRedisRepo;
 import com.aryan.project7.repository.RefreshTokenRepo;
 import com.aryan.project7.repository.UserRepository;
 import com.aryan.project7.security.CookieService;
@@ -20,6 +22,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.modelmapper.ModelMapper;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -51,6 +54,7 @@ public class AuthController {
     private final ModelMapper modelMapper;
     private final CookieService cookieService;
     private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenRedisRepo redisRepo;
 
     // This is the front door. We check credentials and hand out keys (tokens).
     @PostMapping("/login")
@@ -157,10 +161,25 @@ public class AuthController {
                 .revoked(false)
                 .build();
         refreshTokenRepo.save(newRefreshTokenOb);
+        System.out.println("DEBUG: Sending JTI to generator: " + newRefreshTokenOb.getJti());
+        String newRefreshTokenStr = jwtService.generateRefreshToken(user, newRefreshTokenOb.getJti());
+        System.out.println("DEBUG: Resulting Token: " + newRefreshTokenStr);
+        // 1. Generate the string FIRST
 
         String newAccessToken = jwtService.generateAccessToken(user);
-        String newRefreshTokenStr = jwtService.generateRefreshToken(user, newRefreshTokenOb.getJti());
 
+        // 2. NOW you can hash it
+        String hashedToken = DigestUtils.sha256Hex(newRefreshTokenStr);
+
+        // 3. Save to Redis
+        RefreshTokenRedis redisToken = RefreshTokenRedis.builder()
+                .tokenHash(hashedToken)
+                .userId(user.getId().toString())
+                .expiryDate(newRefreshTokenOb.getExpiresAt().getEpochSecond())
+                .build();
+        redisRepo.save(redisToken);
+
+        // 4. Finalize response
         cookieService.attachRefreshCookie(response, newRefreshTokenStr, (int) jwtService.getRefreshTtlSeconds());
         cookieService.addNoStoreHeader(response);
 

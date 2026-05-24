@@ -37,6 +37,12 @@ spring:
             client-secret: ${GITHUB_CLIENT_SECRET}
             scope: read:user, user:email
 
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 2000
+
 # Custom Security Properties (for JwtService & CookieService)
 security:
   jwt:

@@ -2,13 +2,16 @@ package com.aryan.project7.security;
 
 import com.aryan.project7.entity.Provider;
 import com.aryan.project7.entity.RefreshToken;
+import com.aryan.project7.entity.RefreshTokenRedis;
 import com.aryan.project7.entity.User;
+import com.aryan.project7.repository.RefreshTokenRedisRepo;
 import com.aryan.project7.repository.RefreshTokenRepo;
 import com.aryan.project7.repository.UserRepository;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,6 +38,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
     private final JwtService jwtService;
     private final CookieService cookieService;
     private final RefreshTokenRepo refreshTokenRepo;
+    private final RefreshTokenRedisRepo redisRepo;
 
     @Value("${app.auth.frontend.success-redirect}")
     private String frontendSuccessUrl;
@@ -117,11 +121,21 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
         refreshTokenRepo.save(refreshTokenOb);
 
-        // Generate the JWTs
+        // 1. Generate the JWTs
         String refreshToken = jwtService.generateRefreshToken(userEntity, jti);
 
-        // --- NEW LINE: Generate the Access Token ---
+        // Generate the Access Token ---
         String accessToken = jwtService.generateAccessToken(userEntity);
+        // 2. Hash the token for security (Crucial for the "Never store raw" rule)
+        String hashedToken = DigestUtils.sha256Hex(refreshToken);
+        // 3. Save to Redis
+        RefreshTokenRedis redisToken = RefreshTokenRedis.builder()
+                .tokenHash(hashedToken)
+                .userId(userEntity.getId().toString())
+                .expiryDate(Instant.now().plusSeconds(jwtService.getRefreshTtlSeconds()).getEpochSecond())
+                .build();
+
+        redisRepo.save(redisToken);
 
         // Stick the refresh token in a secure cookie
         cookieService.attachRefreshCookie(response, refreshToken, (int) jwtService.getRefreshTtlSeconds());

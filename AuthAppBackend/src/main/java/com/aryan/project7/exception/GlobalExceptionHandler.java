@@ -24,58 +24,56 @@ public class GlobalExceptionHandler {
 
     private final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    // This block handles all the common "Authentication" headaches like wrong passwords or disabled accounts
+    // Unifies all Auth exceptions into the ApiError format
     @ExceptionHandler({
             UsernameNotFoundException.class,
             BadCredentialsException.class,
             CredentialsExpiredException.class,
             DisabledException.class
     })
-    public ResponseEntity<ApiError> handleAuthException(Exception e, HttpServletRequest servletRequest){
-        // We log what happened so we can track issues in the console
-        logger.info("Auth Exception caught: {} ", e.getClass().getName());
-
-        // We use our ApiError DTO here to keep the error format consistent
-        var apiError = ApiError.of(
-                HttpStatus.BAD_REQUEST.value(),
-                "Authentication Issue",
-                e.getMessage(),
-                servletRequest.getRequestURI()
+    public ResponseEntity<ApiError> handleAuthException(Exception e, HttpServletRequest request) {
+        logger.info("Auth Exception: {}", e.getMessage());
+        return ResponseEntity.badRequest().body(
+                ApiError.of(HttpStatus.BAD_REQUEST.value(), "Authentication Issue", e.getMessage(), request.getRequestURI(), false)
         );
-        return ResponseEntity.badRequest().body(apiError);
     }
 
-    // Custom handler for when we look for something in the DB (like a User) and it's just not there
+    // Unifies ResourceNotFound
     @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleResourceNotFoundException(ResourceNotFoundException exception){
-        ErrorResponse errorResponse = new ErrorResponse(exception.getMessage(), HttpStatus.NOT_FOUND);
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
-    }
-
-    // Standard handler for when a method receives a bad argument (like an empty string where it shouldn't be)
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ErrorResponse> handleIllegalArgumentException(IllegalArgumentException exception){
-        ErrorResponse errorResponse = new ErrorResponse(exception.getMessage(), HttpStatus.BAD_REQUEST);
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
-    }
-
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, Object>> handleValidationException(
-            MethodArgumentNotValidException ex,
-            HttpServletRequest request) {
-
-        Map<String, String> errors = new HashMap<>();
-        ex.getBindingResult().getFieldErrors().forEach(error ->
-                errors.put(error.getField(), error.getDefaultMessage())
+    public ResponseEntity<ApiError> handleResourceNotFound(ResourceNotFoundException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                ApiError.of(HttpStatus.NOT_FOUND.value(), "Not Found", ex.getMessage(), request.getRequestURI(), false)
         );
+    }
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("status", HttpStatus.BAD_REQUEST.value());
-        response.put("error", "Validation Error");
-        response.put("message", "Invalid request parameters");
-        response.put("path", request.getRequestURI());
-        response.put("fieldErrors", errors);
+    // Unifies Validation errors
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiError> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest request) {
+        String msg = ex.getBindingResult().getFieldErrors().get(0).getDefaultMessage();
+        return ResponseEntity.badRequest().body(
+                ApiError.of(HttpStatus.BAD_REQUEST.value(), "Validation Failed", msg, request.getRequestURI(), false)
+        );
+    }
 
-        return ResponseEntity.badRequest().body(response);
+    // Unifies General/Illegal Arguments
+    @ExceptionHandler({IllegalArgumentException.class, Exception.class})
+    public ResponseEntity<ApiError> handleGeneral(Exception ex, HttpServletRequest request) {
+        HttpStatus status = (ex instanceof IllegalArgumentException) ? HttpStatus.BAD_REQUEST : HttpStatus.INTERNAL_SERVER_ERROR;
+        return ResponseEntity.status(status).body(
+                ApiError.of(status.value(), "Server Error", ex.getMessage(), request.getRequestURI(), false)
+        );
+    }
+
+    @ExceptionHandler(RateLimitException.class)
+    public ResponseEntity<ApiError> handleRateLimit(RateLimitException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(
+                ApiError.of(
+                        HttpStatus.TOO_MANY_REQUESTS.value(),
+                        "Too Many Requests",
+                        ex.getMessage(), // This will now resolve correctly!
+                        request.getRequestURI(),
+                        false
+                )
+        );
     }
 }

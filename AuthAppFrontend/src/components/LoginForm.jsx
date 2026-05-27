@@ -6,7 +6,9 @@ import './LoginForm.css';
 function LoginForm() {
     const navigate = useNavigate();
     const [formData, setFormData] = useState({ email: '', password: '' });
-
+    const handleSocialLogin = (provider) => {
+        window.location.href = `http://localhost:8080/oauth2/authorization/${provider}`;
+      };
     const [loading, setLoading] = useState(false);
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -44,7 +46,29 @@ function LoginForm() {
             <button type="submit" disabled={loading}>
                 {loading ? 'Authenticating...' : 'Continue'}
             </button>
+            <div className="social-login-container">
+                <p className="divider">OR</p>
+                <button 
+                    type="button" 
+                    className="social-btn google-btn" 
+                    onClick={() => window.location.href = 'http://localhost:8083/oauth2/authorization/google'}
+                >
+                    Login with Google
+                </button>
+                <button 
+                    type="button" 
+                    className="social-btn github-btn" 
+                    onClick={() => window.location.href = 'http://localhost:8083/oauth2/authorization/github'}
+                >
+                    Login with GitHub
+                </button>
+            </div>
+            <p style={{ marginTop: '1rem', color: '#888' }}>
+                Don't have an account? <a href="/register" style={{ color: '#fff' }}>Sign up here</a>
+            </p>
+
         </form>
+        
     );
 }
 

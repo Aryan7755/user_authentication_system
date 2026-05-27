@@ -142,14 +142,10 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
         logger.info("User {} is logged in. Redirecting to frontend...", userEntity.getEmail());
 
-        // --- NEW LOGIC: Attach the Access Token to the URL safely ---
-        String finalRedirectUrl = org.springframework.web.util.UriComponentsBuilder
-                .fromUriString(frontendSuccessUrl)
-                .queryParam("token", accessToken)
-                .build().toUriString();
 
-        // Send the user back to the frontend (e.g., your React/Angular dashboard)
-        response.sendRedirect(finalRedirectUrl);
+// Simply redirect to your dashboard.
+// Your frontend AuthProvider/ProtectedRoute will handle the session validation.
+        response.sendRedirect(frontendSuccessUrl);
 
     }
 }

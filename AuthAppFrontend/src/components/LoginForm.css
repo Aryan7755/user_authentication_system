@@ -30,3 +30,30 @@
   button:hover {
     background: #e0e0e0;
   }
+
+  .social-login-container {
+    margin-top: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .divider {
+    text-align: center;
+    color: #555;
+    font-size: 0.8rem;
+  }
+  
+  .social-btn {
+    padding: 10px;
+    border: 1px solid #333;
+    background: #1e1e1e;
+    color: white;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.3s;
+  }
+  
+  .social-btn:hover {
+    background: #333;
+  }

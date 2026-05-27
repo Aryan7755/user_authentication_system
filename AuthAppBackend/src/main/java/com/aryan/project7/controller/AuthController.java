@@ -256,4 +256,12 @@ public class AuthController {
         dto.setPassword(userDto.password());
         return ResponseEntity.status(HttpStatus.CREATED).body(authService.registerUser(dto));
     }
+
+   // @GetMapping("/validate")
+    @GetMapping("/validate")
+    public ResponseEntity<?> validateSession() {
+        // If this hits, the JWT filter already verified the user.
+        // Just return 200 OK.
+        return ResponseEntity.ok("Session is valid");
+    }
 }

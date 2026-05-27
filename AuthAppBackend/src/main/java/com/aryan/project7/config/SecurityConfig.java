@@ -37,14 +37,16 @@ public class SecurityConfig {
     private final OAuth2FailureHandler oauth2FailureHandler;
     private final RefreshTokenFilter  refreshTokenFilter;
     private final RateLimitFilter rateLimitFilter;
+    private final ObjectMapper objectMapper;
 
     // Standard constructor injection for our filter and success handler
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter, AuthenticationSuccessHandler authenticationSuccessHandler, OAuth2FailureHandler oauth2FailureHandler, RefreshTokenFilter refreshTokenFilter, RateLimitFilter rateLimitFilter) {
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter, AuthenticationSuccessHandler authenticationSuccessHandler, OAuth2FailureHandler oauth2FailureHandler, RefreshTokenFilter refreshTokenFilter, RateLimitFilter rateLimitFilter, ObjectMapper objectMapper) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.authenticationSuccessHandler = authenticationSuccessHandler;
         this.oauth2FailureHandler = oauth2FailureHandler;
         this.refreshTokenFilter = refreshTokenFilter;
         this.rateLimitFilter = rateLimitFilter;
+        this.objectMapper = objectMapper;
     }
 
     @Bean
@@ -121,7 +123,7 @@ public class SecurityConfig {
 
                     // Sending back a nice JSON object instead of a messy stack trace
                     var apiError = ApiError.of(HttpStatus.UNAUTHORIZED.value(), "Unauthorized Access", message, request.getRequestURI(), true);
-                    var objectMapper = new ObjectMapper();
+                    //var objectMapper = new ObjectMapper();
                     response.getWriter().write(objectMapper.writeValueAsString(apiError));
                 }))
 

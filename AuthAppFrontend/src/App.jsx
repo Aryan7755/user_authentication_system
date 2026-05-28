@@ -4,12 +4,15 @@ import RegisterForm from './components/RegisterForm';
 import Dashboard from './pages/Dashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
+import Profile from './pages/Profile';
 
 function App() {
   return (
     <AuthProvider>
       <Router>
         <Routes>
+          {/* Add these two lines to handle the root path */}
+          <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<LoginForm />} />
           <Route path="/register" element={<RegisterForm />} />
           <Route path="/dashboard" element={
@@ -17,7 +20,11 @@ function App() {
               <Dashboard />
             </ProtectedRoute>
           } />
-          <Route path="/" element={<Navigate to="/login" />} />
+          <Route path="/profile" element={
+            <ProtectedRoute>
+              <Profile />
+            </ProtectedRoute>
+          } />
         </Routes>
       </Router>
     </AuthProvider>

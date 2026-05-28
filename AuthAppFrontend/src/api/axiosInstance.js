@@ -40,11 +40,15 @@ axiosInstance.interceptors.response.use(
         
         return axiosInstance(originalRequest);
       } catch (refreshError) {
-        // Refresh failed: session is truly dead. Clear local state and go to login.
         localStorage.removeItem('accessToken');
-        window.location.href = '/login';
+        
+        // Only redirect if NOT already on the login page
+        if (!window.location.pathname.includes('/login')) {
+            window.location.href = '/login';
+        }
+        
         return Promise.reject(refreshError);
-      }
+    }
     }
     return Promise.reject(error);
   }

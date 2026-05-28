@@ -145,7 +145,9 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
 // Simply redirect to your dashboard.
 // Your frontend AuthProvider/ProtectedRoute will handle the session validation.
-        response.sendRedirect(frontendSuccessUrl);
+        if (!response.isCommitted()) {
+            response.sendRedirect(frontendSuccessUrl);
+        }
 
     }
 }

@@ -258,10 +258,17 @@ public class AuthController {
     }
 
    // @GetMapping("/validate")
-    @GetMapping("/validate")
-    public ResponseEntity<?> validateSession() {
-        // If this hits, the JWT filter already verified the user.
-        // Just return 200 OK.
-        return ResponseEntity.ok("Session is valid");
-    }
+   @GetMapping("/validate")
+   public ResponseEntity<Object> validateSession(Authentication authentication) {
+
+       if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getName())) {
+           return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+       }
+
+       String email = authentication.getName();
+
+       return userRepository.findByEmail(email)
+               .<ResponseEntity<Object>>map(user -> ResponseEntity.ok(modelMapper.map(user, UserDto.class)))
+               .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found"));
+   }
 }

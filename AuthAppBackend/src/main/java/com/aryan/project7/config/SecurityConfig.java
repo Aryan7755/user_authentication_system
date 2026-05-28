@@ -85,7 +85,7 @@ public class SecurityConfig {
         httpSecurity
                 .headers(headers -> headers
                         .frameOptions(frameOptions -> frameOptions.sameOrigin())
-                        .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'"))
+                        .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self' https://accounts.google.com https://github.com;"))
                 )
                 // We're disabling CSRF because we're using JWTs (and it's a headache for APIs anyway)
                 .csrf(AbstractHttpConfigurer::disable)
@@ -132,7 +132,7 @@ public class SecurityConfig {
                 // runs first
                 .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(refreshTokenFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(jwtAuthenticationFilter, RefreshTokenFilter.class);// Refresh token
+                .addFilterAfter(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return httpSecurity.build();
     }
 

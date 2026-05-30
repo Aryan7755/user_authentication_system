@@ -1,9 +1,6 @@
 package com.aryan.project7.security;
 
-import com.aryan.project7.entity.Provider;
-import com.aryan.project7.entity.RefreshToken;
-import com.aryan.project7.entity.RefreshTokenRedis;
-import com.aryan.project7.entity.User;
+import com.aryan.project7.entity.*;
 import com.aryan.project7.repository.RefreshTokenRedisRepo;
 import com.aryan.project7.repository.RefreshTokenRepo;
 import com.aryan.project7.repository.UserRepository;
@@ -24,13 +21,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
-// This class kicks in right after a user successfully logs in via Google or GitHub.
-// Its job is to save the user to our DB if they're new and hand out our own JWTs.
 @Component
 @RequiredArgsConstructor
-@Transactional
 public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
@@ -44,110 +39,83 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
     private String frontendSuccessUrl;
 
     @Override
+    @Transactional
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
+        if (response.isCommitted()) {
+            logger.debug("Response already committed, skipping redirect.");
+            return;
+        }
+
         logger.info("Social login successful! Processing user data...");
 
         OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
-        String registrationId = "unknown";
+        String registrationId = (authentication instanceof OAuth2AuthenticationToken token)
+                ? token.getAuthorizedClientRegistrationId() : "unknown";
 
-        // Figure out if they came from Google, GitHub, etc.
-        if (authentication instanceof OAuth2AuthenticationToken token) {
-            registrationId = token.getAuthorizedClientRegistrationId();
+        User userEntity = processUser(oAuth2User, registrationId);
+
+        // --- IDEMPOTENCY CHECK: Reuse active session if it exists ---
+        Optional<RefreshToken> activeTokenOpt = refreshTokenRepo.findByUserAndRevokedFalse(userEntity);
+
+        String refreshToken;
+        if (activeTokenOpt.isPresent()) {
+            refreshToken = jwtService.generateRefreshToken(userEntity, activeTokenOpt.get().getJti());
+            logger.info("Reusing existing session for user: {}", userEntity.getEmail());
+        } else {
+            String jti = UUID.randomUUID().toString();
+            RefreshToken refreshTokenOb = RefreshToken.builder()
+                    .jti(jti)
+                    .user(userEntity)
+                    .revoked(false)
+                    .createdAt(Instant.now())
+                    .expiresAt(Instant.now().plusSeconds(jwtService.getRefreshTtlSeconds()))
+                    .build();
+            refreshTokenRepo.save(refreshTokenOb);
+            refreshToken = jwtService.generateRefreshToken(userEntity, jti);
+            logger.info("Created new session for user: {}", userEntity.getEmail());
         }
 
-        User userEntity;
-
-        // We handle different social providers here since they all send data in different formats
-        switch (registrationId) {
-            case "google" -> {
-                String googleId = oAuth2User.getAttribute("sub");
-                String email = oAuth2User.getAttribute("email");
-                if (email == null || email.isBlank()) {
-                    throw new RuntimeException("Google account missing email. Contact support.");
-                }
-                String name = oAuth2User.getAttribute("name");
-                String picture = oAuth2User.getAttribute("picture");
-
-                User newUser = User.builder()
-                        .email(email)
-                        .name(name)
-                        .image(picture)
-                        .enabled(true)
-                        .provider(Provider.GOOGLE)
-                        .providerId(googleId)
-                        .build();
-
-                // If we've seen this email before, just use that user. If not, save the new one.
-                userEntity = userRepository.findByEmail(email).orElseGet(() -> userRepository.save(newUser));
-            }
-            case "github" -> {
-                // Safely retrieve the ID object
-                Object idObj = oAuth2User.getAttribute("id");
-
-                // Convert to String regardless of whether it's an Integer, Long, or String
-                String githubId = (idObj != null) ? idObj.toString() : null;
-
-                String email = oAuth2User.getAttribute("email");
-                String name = oAuth2User.getAttribute("login");
-                String image = oAuth2User.getAttribute("avatar_url");
-
-                if (email == null) {
-                    email = name + "@github.com";
-                }
-
-                User newUser = User.builder()
-                        .email(email)
-                        .name(name)
-                        .image(image)
-                        .enabled(true)
-                        .provider(Provider.GITHUB)
-                        .providerId(githubId)
-                        .build();
-
-                userEntity = userRepository.findByEmail(email).orElseGet(() -> userRepository.save(newUser));
-            }
-            default -> throw new RuntimeException("We don't support " + registrationId + " yet!");
-        }
-
-        // Now that we have a user in our DB, we generate our own session tokens
-        String jti = UUID.randomUUID().toString();
-        RefreshToken refreshTokenOb = RefreshToken.builder()
-                .jti(jti)
-                .user(userEntity)
-                .revoked(false)
-                .createdAt(Instant.now())
-                .expiresAt(Instant.now().plusSeconds(jwtService.getRefreshTtlSeconds()))
-                .build();
-
-        refreshTokenRepo.save(refreshTokenOb);
-
-        // 1. Generate the JWTs
-        String refreshToken = jwtService.generateRefreshToken(userEntity, jti);
-
-        // Generate the Access Token ---
-        String accessToken = jwtService.generateAccessToken(userEntity);
-        // 2. Hash the token for security (Crucial for the "Never store raw" rule)
+        // --- Update Redis Cache ---
         String hashedToken = DigestUtils.sha256Hex(refreshToken);
-        // 3. Save to Redis
         RefreshTokenRedis redisToken = RefreshTokenRedis.builder()
                 .tokenHash(hashedToken)
                 .userId(userEntity.getId().toString())
                 .expiryDate(Instant.now().plusSeconds(jwtService.getRefreshTtlSeconds()).getEpochSecond())
                 .build();
-
         redisRepo.save(redisToken);
 
-        // Stick the refresh token in a secure cookie
+        // --- Finalize response ---
         cookieService.attachRefreshCookie(response, refreshToken, (int) jwtService.getRefreshTtlSeconds());
 
-        logger.info("User {} is logged in. Redirecting to frontend...", userEntity.getEmail());
+        logger.info("Redirecting user {} to frontend...", userEntity.getEmail());
+        response.sendRedirect(frontendSuccessUrl);
+    }
 
-
-// Simply redirect to your dashboard.
-// Your frontend AuthProvider/ProtectedRoute will handle the session validation.
-        if (!response.isCommitted()) {
-            response.sendRedirect(frontendSuccessUrl);
-        }
-
+    private User processUser(OAuth2User oAuth2User, String registrationId) {
+        return switch (registrationId) {
+            case "google" -> {
+                String email = oAuth2User.getAttribute("email");
+                yield userRepository.findByEmail(email).orElseGet(() -> userRepository.save(User.builder()
+                        .email(email)
+                        .name(oAuth2User.getAttribute("name"))
+                        .image(oAuth2User.getAttribute("picture"))
+                        .enabled(true)
+                        .provider(Provider.GOOGLE)
+                        .providerId(oAuth2User.getAttribute("sub"))
+                        .build()));
+            }
+            case "github" -> {
+                String email = oAuth2User.getAttribute("email") != null ? oAuth2User.getAttribute("email") : oAuth2User.getAttribute("login") + "@github.com";
+                yield userRepository.findByEmail(email).orElseGet(() -> userRepository.save(User.builder()
+                        .email(email)
+                        .name(oAuth2User.getAttribute("login"))
+                        .image(oAuth2User.getAttribute("avatar_url"))
+                        .enabled(true)
+                        .provider(Provider.GITHUB)
+                        .providerId(String.valueOf(oAuth2User.getAttribute("id")))
+                        .build()));
+            }
+            default -> throw new RuntimeException("Provider " + registrationId + " not supported!");
+        };
     }
 }

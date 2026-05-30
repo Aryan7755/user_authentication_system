@@ -7,6 +7,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -16,6 +18,9 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class RefreshTokenFilter extends OncePerRequestFilter {
 
+    // Added the missing logger definition
+    private final Logger logger = LoggerFactory.getLogger(RefreshTokenFilter.class);
+
     private final RefreshTokenRedisRepo redisRepo;
     private final CookieService cookieService;
 
@@ -23,29 +28,37 @@ public class RefreshTokenFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        // Only trigger on your refresh endpoint
-        if (!request.getRequestURI().equals("/api/v1/auth/refresh")) {
+        // 1. Only trigger if the user is hitting the refresh endpoint
+        if (!request.getRequestURI().contains("/api/v1/auth/refresh")) {
             filterChain.doFilter(request, response);
             return;
         }
 
+        // 2. Get the token
         String refreshToken = cookieService.getRefreshCookie(request);
-        if (refreshToken == null) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+
+        // 3. Perform a null check
+        if (refreshToken == null || refreshToken.isEmpty()) {
+            filterChain.doFilter(request, response);
             return;
         }
 
+        // 4. Verify token existence in Redis
         String hashedToken = DigestUtils.sha256Hex(refreshToken);
+        boolean exists = redisRepo.existsById(hashedToken);
 
-        // --- THE SECURITY CORE ---
-        if (redisRepo.existsById(hashedToken)) {
-            // Token is valid!
-            // Delete it immediately (Single-use rotation pattern)
-            redisRepo.deleteById(hashedToken);
-            filterChain.doFilter(request, response);
-        } else {
-            // Token either doesn't exist or was already used (Replay attack detected!)
+        // 5. Debug logging
+        logger.info("FILTER DEBUG -> Cookie Value: {}", refreshToken.substring(0, Math.min(refreshToken.length(), 10)) + "...");
+        logger.info("FILTER DEBUG -> Hashed Token: {}", hashedToken);
+        logger.info("FILTER DEBUG -> Exists in Redis: {}", exists);
+
+        if (!exists) {
+            logger.warn("REJECTED: Token hash {} not found in Redis!", hashedToken);
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            return; // Stop the chain here
         }
+
+        // Token exists, proceed
+        filterChain.doFilter(request, response);
     }
 }

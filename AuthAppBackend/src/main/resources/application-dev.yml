@@ -54,7 +54,7 @@ security:
     cookie-secure: ${JWT_COOKIE_SECURE:false} # Set to false for local HTTP development
     cookie-http-only: ${JWT_COOKIE_ONLY:true}
     cookie-same-site: ${JWT_COOKIE_SAME_SITE:lax}
-    cookie-domain: ${JWT_COOKIE_DOMAIN:localhost}
+    cookie-domain:
 
 # Frontend Redirection Properties
 app:

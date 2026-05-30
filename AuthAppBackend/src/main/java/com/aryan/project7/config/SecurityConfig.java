@@ -103,8 +103,11 @@ public class SecurityConfig {
 
                 // Handling social logins (Google, GitHub, etc.)
                 .oauth2Login(oauth2 -> oauth2
+                        .authorizationEndpoint(auth -> auth.baseUri("/oauth2/authorization"))
+                        .redirectionEndpoint(redirection -> redirection.baseUri("/login/oauth2/code/*"))
                         .successHandler(authenticationSuccessHandler)
-                        .failureHandler(oauth2FailureHandler))
+                        .failureHandler(oauth2FailureHandler)
+                )
 
                 .logout(AbstractHttpConfigurer::disable)
 

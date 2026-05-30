@@ -1,6 +1,7 @@
 package com.aryan.project7.repository;
 
 import com.aryan.project7.entity.RefreshToken;
+import com.aryan.project7.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
@@ -18,4 +19,7 @@ public interface RefreshTokenRepo extends JpaRepository<RefreshToken, UUID> {
     void cleanupExpiredTokens();
 
     void deleteByUser_Id(UUID userId);
+
+    Optional<RefreshToken> findByUserAndRevokedFalse(User user);
+
 }

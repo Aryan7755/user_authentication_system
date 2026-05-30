@@ -7,6 +7,8 @@ public class AppConstants {
 
             // This is where the login/signup magic happens
             "/api/v1/auth/**",
+            "/oauth2/**",
+            "/login/oauth2/**",
 
             // Swagger and API docs—super helpful for testing so we keep them open
             "/v3/api-docs/**",

@@ -3,6 +3,7 @@ package com.aryan.project7.security;
 import com.aryan.project7.entity.*;
 import com.aryan.project7.repository.RefreshTokenRedisRepo;
 import com.aryan.project7.repository.RefreshTokenRepo;
+import com.aryan.project7.repository.RoleRepository;
 import com.aryan.project7.repository.UserRepository;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,7 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Component
@@ -30,6 +33,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
     private final UserRepository userRepository;
+    private final RoleRepository roleRepository; // Injected RoleRepository
     private final JwtService jwtService;
     private final CookieService cookieService;
     private final RefreshTokenRepo refreshTokenRepo;
@@ -40,13 +44,9 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
     @Override
     @Transactional
-    public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
-        if (response.isCommitted()) {
-            logger.debug("Response already committed, skipping redirect.");
-            return;
-        }
 
-        logger.info("Social login successful! Processing user data...");
+    public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
+        if (response.isCommitted()) return;
 
         OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
         String registrationId = (authentication instanceof OAuth2AuthenticationToken token)
@@ -54,68 +54,66 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
         User userEntity = processUser(oAuth2User, registrationId);
 
-        // --- IDEMPOTENCY CHECK: Reuse active session if it exists ---
-        Optional<RefreshToken> activeTokenOpt = refreshTokenRepo.findByUserAndRevokedFalse(userEntity);
+        // Fetch list of active tokens
+        List<RefreshToken> activeTokens = refreshTokenRepo.findByUserAndRevokedFalseOrderByCreatedAtDesc(userEntity);
 
         String refreshToken;
-        if (activeTokenOpt.isPresent()) {
-            refreshToken = jwtService.generateRefreshToken(userEntity, activeTokenOpt.get().getJti());
+        if (!activeTokens.isEmpty()) {
+            // Pick the most recent one
+            RefreshToken activeToken = activeTokens.get(0);
+            refreshToken = jwtService.generateRefreshToken(userEntity, activeToken.getJti());
             logger.info("Reusing existing session for user: {}", userEntity.getEmail());
         } else {
-            String jti = UUID.randomUUID().toString();
-            RefreshToken refreshTokenOb = RefreshToken.builder()
-                    .jti(jti)
-                    .user(userEntity)
-                    .revoked(false)
-                    .createdAt(Instant.now())
-                    .expiresAt(Instant.now().plusSeconds(jwtService.getRefreshTtlSeconds()))
-                    .build();
-            refreshTokenRepo.save(refreshTokenOb);
-            refreshToken = jwtService.generateRefreshToken(userEntity, jti);
+            // Create a new one
+            refreshToken = createNewSession(userEntity);
             logger.info("Created new session for user: {}", userEntity.getEmail());
         }
 
         // --- Update Redis Cache ---
-        String hashedToken = DigestUtils.sha256Hex(refreshToken);
-        RefreshTokenRedis redisToken = RefreshTokenRedis.builder()
-                .tokenHash(hashedToken)
-                .userId(userEntity.getId().toString())
-                .expiryDate(Instant.now().plusSeconds(jwtService.getRefreshTtlSeconds()).getEpochSecond())
-                .build();
-        redisRepo.save(redisToken);
+        try {
+            String hashedToken = DigestUtils.sha256Hex(refreshToken);
+            redisRepo.save(RefreshTokenRedis.builder()
+                    .tokenHash(hashedToken)
+                    .userId(userEntity.getId().toString())
+                    .expiryDate(Instant.now().plusSeconds(jwtService.getRefreshTtlSeconds()).getEpochSecond())
+                    .build());
+        } catch (Exception e) {
+            logger.error("Redis unreachable, skipping cache update: {}", e.getMessage());
+        }
 
-        // --- Finalize response ---
         cookieService.attachRefreshCookie(response, refreshToken, (int) jwtService.getRefreshTtlSeconds());
-
-        logger.info("Redirecting user {} to frontend...", userEntity.getEmail());
         response.sendRedirect(frontendSuccessUrl);
+    }
+    private String createNewSession(User user) {
+        String jti = UUID.randomUUID().toString();
+        refreshTokenRepo.save(RefreshToken.builder()
+                .jti(jti).user(user).revoked(false)
+                .createdAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(jwtService.getRefreshTtlSeconds()))
+                .build());
+        return jwtService.generateRefreshToken(user, jti);
     }
 
     private User processUser(OAuth2User oAuth2User, String registrationId) {
-        return switch (registrationId) {
-            case "google" -> {
-                String email = oAuth2User.getAttribute("email");
-                yield userRepository.findByEmail(email).orElseGet(() -> userRepository.save(User.builder()
-                        .email(email)
-                        .name(oAuth2User.getAttribute("name"))
-                        .image(oAuth2User.getAttribute("picture"))
-                        .enabled(true)
-                        .provider(Provider.GOOGLE)
-                        .providerId(oAuth2User.getAttribute("sub"))
-                        .build()));
-            }
-            case "github" -> {
-                String email = oAuth2User.getAttribute("email") != null ? oAuth2User.getAttribute("email") : oAuth2User.getAttribute("login") + "@github.com";
-                yield userRepository.findByEmail(email).orElseGet(() -> userRepository.save(User.builder()
-                        .email(email)
-                        .name(oAuth2User.getAttribute("login"))
-                        .image(oAuth2User.getAttribute("avatar_url"))
-                        .enabled(true)
-                        .provider(Provider.GITHUB)
-                        .providerId(String.valueOf(oAuth2User.getAttribute("id")))
-                        .build()));
-            }
-            default -> throw new RuntimeException("Provider " + registrationId + " not supported!");
-        };
+        // Force exact match for "USER"
+        Role userRole = roleRepository.findByName("USER")
+                .orElseThrow(() -> new RuntimeException("Error: Default Role 'USER' not found in database."));
+
+        String email = registrationId.equals("google") ? oAuth2User.getAttribute("email")
+                : (oAuth2User.getAttribute("email") != null ? oAuth2User.getAttribute("email") : oAuth2User.getAttribute("login") + "@github.com");
+
+        // Use .map() to avoid duplication and build cleanly
+        return userRepository.findByEmail(email).orElseGet(() -> {
+            User newUser = User.builder()
+                    .email(email)
+                    .name(registrationId.equals("google") ? oAuth2User.getAttribute("name") : oAuth2User.getAttribute("login"))
+                    .image(registrationId.equals("google") ? oAuth2User.getAttribute("picture") : oAuth2User.getAttribute("avatar_url"))
+                    .roles(Set.of(userRole)) // Assign the role here
+                    .enabled(true)
+                    .provider(registrationId.equals("google") ? Provider.GOOGLE : Provider.GITHUB)
+                    .providerId(registrationId.equals("google") ? oAuth2User.getAttribute("sub") : String.valueOf(oAuth2User.getAttribute("id")))
+                    .build();
+            return userRepository.save(newUser);
+        });
     }
 }

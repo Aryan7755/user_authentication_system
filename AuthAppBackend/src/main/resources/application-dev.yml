@@ -58,10 +58,10 @@ security:
     access-ttl-seconds: ${JWT_ACCESS_TTL_SECONDS:3600}
     refresh-ttl-seconds: ${JWT_REFRESH_TTL_SECONDS:86400}
     refresh-token-cookie-name: ${JWT_REFRESH_COOKIE_NAME:refreshToken}
-    cookie-secure: ${JWT_COOKIE_SECURE:false}
-    cookie-http-only: ${JWT_COOKIE_ONLY:true}
-    cookie-same-site: ${JWT_COOKIE_SAME_SITE:lax}
-    cookie-domain:
+    cookie-secure: false        # MUST be false for http://localhost
+    cookie-same-site: Lax      # "Lax" is required for localhost
+    cookie-domain: ""           # EMPTY - let the browser handle it
+    cookie-http-only: true
 
 # Frontend Redirection Properties
 app:

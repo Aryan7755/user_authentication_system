@@ -9,6 +9,9 @@ import lombok.RequiredArgsConstructor;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -18,47 +21,51 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class RefreshTokenFilter extends OncePerRequestFilter {
 
-    // Added the missing logger definition
     private final Logger logger = LoggerFactory.getLogger(RefreshTokenFilter.class);
 
     private final RefreshTokenRedisRepo redisRepo;
     private final CookieService cookieService;
+    private final JwtService jwtService; // Ensure this is injected
+    private final CustomUserDetailService customUserDetailService; // Ensure this is injected
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        // 1. Only trigger if the user is hitting the refresh endpoint
-        if (!request.getRequestURI().contains("/api/v1/auth/refresh")) {
-            filterChain.doFilter(request, response);
-            return;
-        }
+        logger.info("FILTER CHECK: Request URI: {}", request.getRequestURI());
 
-        // 2. Get the token
         String refreshToken = cookieService.getRefreshCookie(request);
 
-        // 3. Perform a null check
         if (refreshToken == null || refreshToken.isEmpty()) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        // 4. Verify token existence in Redis
         String hashedToken = DigestUtils.sha256Hex(refreshToken);
         boolean exists = redisRepo.existsById(hashedToken);
-
-        // 5. Debug logging
-        logger.info("FILTER DEBUG -> Cookie Value: {}", refreshToken.substring(0, Math.min(refreshToken.length(), 10)) + "...");
-        logger.info("FILTER DEBUG -> Hashed Token: {}", hashedToken);
-        logger.info("FILTER DEBUG -> Exists in Redis: {}", exists);
 
         if (!exists) {
             logger.warn("REJECTED: Token hash {} not found in Redis!", hashedToken);
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            return; // Stop the chain here
+            return;
         }
 
-        // Token exists, proceed
+        // --- AUTHENTICATION LOGIC ---
+        // Only set the context if it's not already set
+        if (SecurityContextHolder.getContext().getAuthentication() == null) {
+            String userEmail = jwtService.extractEmail(refreshToken); // Extract email from JWT
+
+            if (userEmail != null) {
+                var userDetails = customUserDetailService.loadUserByUsername(userEmail);
+                var authToken = new UsernamePasswordAuthenticationToken(
+                        userDetails, null, userDetails.getAuthorities());
+                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+                SecurityContextHolder.getContext().setAuthentication(authToken);
+                logger.info("Successfully authenticated user: {}", userEmail);
+            }
+        }
+
         filterChain.doFilter(request, response);
     }
 }

@@ -16,9 +16,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
 
-// This service is the "Master Key" maker for the app.
-// It handles everything related to creating and reading JWTs.
 @Service
 @Getter
 @Setter
@@ -33,8 +32,6 @@ public class JwtService {
                       @Value("${security.jwt.refresh-ttl-seconds}") long refreshTtlSeconds,
                       @Value("${security.jwt.issuer}") String issuer) {
 
-        // Security check: if the secret is too short, the HS512 algorithm will complain,
-        // so we catch it early.
         if (secret == null || secret.length() < 64)
             throw new IllegalArgumentException("Your JWT secret needs to be at least 64 characters long!");
 
@@ -44,12 +41,8 @@ public class JwtService {
         this.issuer = issuer;
     }
 
-    // Creates a short-lived token that the user sends with every API request
     public String generateAccessToken(User user) {
         Instant now = Instant.now();
-
-        // We pack the roles into the token so the "JwtAuthenticationFilter"
-        // doesn't have to hit the database to know what the user is allowed to do.
         List<String> roles = user.getRoles() == null ? List.of() :
                 user.getRoles().stream().map(Role::getName).toList();
 
@@ -62,53 +55,59 @@ public class JwtService {
                 .claims(Map.of(
                         "email", user.getEmail(),
                         "roles", roles,
-                        "typ", "access" // This label prevents using this token as a refresh token
+                        "typ", "access"
                 ))
                 .signWith(secretKey, SignatureAlgorithm.HS512)
                 .compact();
     }
 
-    // Creates a long-lived token used only to get a new access token
     public String generateRefreshToken(User user, String jti) {
         Instant now = Instant.now();
         return Jwts.builder()
-                .id(jti) // We use the JTI from the database so we can revoke it if needed
+                .id(jti)
                 .subject(user.getId().toString())
                 .issuer(issuer)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusSeconds(refreshTtlSeconds)))
                 .claims(Map.of(
-                        "typ", "refresh"
+                        "typ", "refresh",
+                        "email", user.getEmail() // Added email to refresh token too for easy extraction
                 ))
                 .signWith(secretKey, SignatureAlgorithm.HS512)
                 .compact();
     }
 
-    // This method cracks open the token and verifies the signature
-    public Jws<Claims> parse(String token) {
-        return Jwts.parser().setSigningKey(secretKey).build().parseClaimsJws(token);
+    public Claims parse(String token) {
+        return Jwts.parser()
+                .verifyWith(secretKey)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
     }
 
-    // Helper to check if a token is an "access" type
+    public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
+        final Claims claims = parse(token);
+        return claimsResolver.apply(claims);
+    }
+
+    public String extractEmail(String token) {
+        // Extract the "email" custom claim we set in generate methods
+        return extractClaim(token, claims -> claims.get("email", String.class));
+    }
+
     public boolean isAccessToken(String token) {
-        Claims c = parse(token).getPayload();
-        return "access".equals(c.get("typ"));
+        return "access".equals(parse(token).get("typ"));
     }
 
-    // Helper to check if a token is a "refresh" type
     public boolean isRefreshToken(String token) {
-        Claims c = parse(token).getPayload();
-        return "refresh".equals(c.get("typ"));
+        return "refresh".equals(parse(token).get("typ"));
     }
 
-    // Extracts the user ID from the token subject
     public UUID getUserId(String token) {
-        Claims c = parse(token).getPayload();
-        return UUID.fromString(c.getSubject());
+        return UUID.fromString(parse(token).getSubject());
     }
 
-    // Gets the unique ID of the token itself
     public String getJti(String token) {
-        return parse(token).getPayload().getId();
+        return parse(token).getId();
     }
 }

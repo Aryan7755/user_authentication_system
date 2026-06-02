@@ -41,23 +41,20 @@ public class CookieService {
 
     // This method takes a refresh token and "staples" it to the response as a cookie
     public void attachRefreshCookie(HttpServletResponse response, String value, int maxAge) {
-
         logger.info("Attaching cookie with name: {} and value: {} ", refreshTokenCookieName, value);
 
+        // Modern browsers require SameSite=None to be Secure=true.
+        // For local development (HTTP), we use SameSite=Lax.
         var responseCookieBuilder = ResponseCookie.from(refreshTokenCookieName, value)
-                // HttpOnly means JavaScript can't touch this—huge for security!
                 .httpOnly(cookieHttpOnly)
-                // Secure means it only travels over HTTPS
-                .secure(cookieSecure)
+                .secure(cookieSecure) // Must match application.properties (should be false for local)
                 .path("/")
                 .maxAge(maxAge)
-                // SameSite helps prevent CSRF attacks
-                .sameSite(cookieSameSite);
+                .sameSite(cookieSameSite); // Ensure this is "Lax" for local dev
 
-        // If we have a specific domain (like .ourapp.com), we set it here
-        if (cookieDomain != null && !cookieDomain.isBlank()) {
-            responseCookieBuilder.domain(cookieDomain);
-        }
+        // Note: Do NOT set .domain("localhost") for local development.
+        // Browsers often reject explicit localhost domains in cookies.
+        // Let the browser default to the current origin.
 
         ResponseCookie responseCookie = responseCookieBuilder.build();
         response.addHeader(HttpHeaders.SET_COOKIE, responseCookie.toString());

@@ -183,10 +183,13 @@ public class AuthController {
     }
 
     @GetMapping("/validate")
-    public ResponseEntity<UserDto> validateSession(Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+    public ResponseEntity<?> validateSession(Authentication authentication) {
+        // If not authenticated, return a 200 with an empty body or a specific "guest" state
+        // rather than throwing a 401, because the path is permitted.
+        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
+            return ResponseEntity.ok(null); // Or return a custom "Guest" DTO
         }
+
         return userRepository.findByEmail(authentication.getName())
                 .map(user -> ResponseEntity.ok(modelMapper.map(user, UserDto.class)))
                 .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND).build());

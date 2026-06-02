@@ -2,7 +2,11 @@ package com.aryan.project7.security;
 
 import com.aryan.project7.helper.UserHelper;
 import com.aryan.project7.repository.UserRepository;
-import io.jsonwebtoken.*;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.MalformedJwtException;
+import io.jsonwebtoken.security.SignatureException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -10,17 +14,13 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -52,20 +52,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 return;
             }
 
-            // Parse token
-            Jws<Claims> jwsClaims = jwtService.parse(token);
-            Claims payload = jwsClaims.getPayload();
+            // Parse token: parse() now returns Claims directly
+            Claims payload = jwtService.parse(token);
+
             String userId = payload.getSubject();
             UUID userUuid = UserHelper.parseUUID(userId);
 
             // Look up the user
             userRepository.findById(userUuid).ifPresent(user -> {
                 if (user.isEnabled()) {
-                    // FIX: Pass the entire User object as the principal, and use its built-in authorities
                     UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                             user,
                             null,
-                            user.getAuthorities() // This now correctly includes the "ROLE_" prefix!
+                            user.getAuthorities()
                     );
 
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

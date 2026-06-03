@@ -14,6 +14,8 @@ import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.modelmapper.ModelMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -40,6 +42,7 @@ public class AuthController {
     private final ModelMapper modelMapper;
     private final CookieService cookieService;
     private final RefreshTokenRedisRepo redisRepo;
+    private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
 
     @PostMapping("/login")
     public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest loginRequest, HttpServletResponse response) {
@@ -67,6 +70,19 @@ public class AuthController {
 
         String accessToken = jwtService.generateAccessToken(user);
         String refreshToken = jwtService.generateRefreshToken(user, refreshTokenOb.getJti());
+
+        try {
+            String hashedToken = DigestUtils.sha256Hex(refreshToken);
+            redisRepo.save(RefreshTokenRedis.builder()
+                    .tokenHash(hashedToken)
+                    .userId(user.getId().toString())
+                    .expiryDate(refreshTokenOb.getExpiresAt().getEpochSecond())
+                    .ttl(jwtService.getRefreshTtlSeconds()) // Ensure TTL matches
+                    .build());
+        } catch (Exception e) {
+            // Log if Redis is down, but keep the user logged in
+            logger.error("Redis unreachable during login: {}", e.getMessage());
+        }
 
         cookieService.attachRefreshCookie(response, refreshToken, (int) jwtService.getRefreshTtlSeconds());
         cookieService.addNoStoreHeader(response);
@@ -138,23 +154,6 @@ public class AuthController {
         return ResponseEntity.ok(TokenResponse.of(newAccessToken, newRefreshTokenStr, jwtService.getAccessTtlSeconds(), modelMapper.map(user, UserDto.class)));
     }
 
-    @PostMapping("/logout")
-    public ResponseEntity<Void> logout(HttpServletRequest request, HttpServletResponse response) {
-        readRefreshTokenFromRequest(null, request).ifPresent(token -> {
-            try {
-                if (jwtService.isRefreshToken(token)) {
-                    String jti = jwtService.getJti(token);
-                    refreshTokenRepo.findByJti(jti).ifPresent(rt -> {
-                        rt.setRevoked(true);
-                        refreshTokenRepo.save(rt);
-                    });
-                }
-            } catch (JwtException ignored) {}
-        });
-        cookieService.clearRefreshCookie(response);
-        SecurityContextHolder.clearContext();
-        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
-    }
 
     private Optional<String> readRefreshTokenFromRequest(RefreshTokenRequest body, HttpServletRequest request) {
         if (request.getCookies() != null) {
@@ -193,5 +192,30 @@ public class AuthController {
         return userRepository.findByEmail(authentication.getName())
                 .map(user -> ResponseEntity.ok(modelMapper.map(user, UserDto.class)))
                 .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND).build());
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<String> logout(HttpServletRequest request, HttpServletResponse response) {
+        String refreshToken = cookieService.getRefreshTokenFromCookie(request);
+
+        if (refreshToken != null) {
+            // Use the method that calls parse(token).getId()
+            String jti = jwtService.getJti(refreshToken);
+
+            // Revoke in MySQL
+            refreshTokenRepo.findByJti(jti).ifPresent(token -> {
+                token.setRevoked(true);
+                refreshTokenRepo.save(token);
+            });
+
+            // Delete from Redis
+            String hashedToken = DigestUtils.sha256Hex(refreshToken);
+            redisRepo.deleteById(hashedToken);
+
+            // Clear Cookie
+            cookieService.clearRefreshCookie(response);
+        }
+
+        return ResponseEntity.ok("Logged out successfully");
     }
 }

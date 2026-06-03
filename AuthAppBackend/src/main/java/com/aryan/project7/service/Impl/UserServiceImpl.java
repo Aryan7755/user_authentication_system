@@ -25,7 +25,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
 @Service
 @AllArgsConstructor
@@ -40,17 +39,20 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public UserDto createUser(UserDto userDto) {
-        if (userDto.getEmail() == null || userDto.getEmail().isBlank()) throw new IllegalArgumentException(ValidationMessages.EMAIL_REQUIRED);
-        if (userDto.getPassword() == null || userDto.getPassword().isBlank()) throw new IllegalArgumentException("Password is required");
-        if (userRepository.existsByEmail(userDto.getEmail())) throw new IllegalArgumentException(ValidationMessages.EMAIL_ALREADY_EXISTS);
+        if (userDto.getEmail() == null || userDto.getEmail().isBlank())
+            throw new IllegalArgumentException(ValidationMessages.EMAIL_REQUIRED);
+        if (userDto.getPassword() == null || userDto.getPassword().isBlank())
+            throw new IllegalArgumentException("Password is required");
+        if (userRepository.existsByEmail(userDto.getEmail()))
+            throw new IllegalArgumentException(ValidationMessages.EMAIL_ALREADY_EXISTS);
 
         User user = modelMapper.map(userDto, User.class);
         user.setProvider(userDto.getProvider() != null ? userDto.getProvider() : Provider.LOCAL);
-        user.setPassword(userDto.getPassword()); // Assumes pre-encoded or handled by AuthController
+        user.setPassword(userDto.getPassword());
         user.setEnabled(true);
 
         Role userRole = roleRepository.findByName("USER")
-                .orElseThrow(() -> new RuntimeException("Default role USER not found in database"));
+                .orElseThrow(() -> new IllegalStateException("System Error: Default role 'USER' is not configured."));
 
         if (user.getRoles() == null) user.setRoles(new HashSet<>());
         user.getRoles().add(userRole);
@@ -61,27 +63,18 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserDto getUserByEmail(String email) {
         return mapToDto(userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User not present with given Email id")));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with Email: " + email)));
     }
 
     @Override
     @Transactional
     public UserDto updateUser(UserDto userDto, String userId) {
         User existingUser = userRepository.findById(UserHelper.parseUUID(userId))
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with the given Id"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        // FIX: Safely retrieve email from Principal
-        String currentLoggedInEmail;
-        if (authentication.getPrincipal() instanceof User userPrincipal) {
-            currentLoggedInEmail = userPrincipal.getEmail();
-        } else {
-            currentLoggedInEmail = authentication.getName();
-        }
-
-        boolean isAdmin = authentication.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        String currentLoggedInEmail = (authentication.getPrincipal() instanceof User u) ? u.getEmail() : authentication.getName();
+        boolean isAdmin = authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
 
         if (!existingUser.getEmail().equals(currentLoggedInEmail) && !isAdmin) {
             throw new AccessDeniedException("You do not have permission to update this profile");
@@ -90,7 +83,8 @@ public class UserServiceImpl implements UserService {
         if (userDto.getName() != null && !userDto.getName().isBlank()) existingUser.setName(userDto.getName());
         if (userDto.getImage() != null) existingUser.setImage(userDto.getImage());
         if (userDto.getProvider() != null) existingUser.setProvider(userDto.getProvider());
-        if (userDto.getPassword() != null && !userDto.getPassword().isBlank()) existingUser.setPassword(passwordEncoder.encode(userDto.getPassword()));
+        if (userDto.getPassword() != null && !userDto.getPassword().isBlank())
+            existingUser.setPassword(passwordEncoder.encode(userDto.getPassword()));
 
         existingUser.setEnabled(userDto.isEnabled());
         existingUser.setUpdatedAt(Instant.now());
@@ -102,7 +96,8 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public void deleteUser(String userId) {
         UUID uuid = UserHelper.parseUUID(userId);
-        User user = userRepository.findById(uuid).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        User user = userRepository.findById(uuid)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
         refreshTokenRepo.deleteByUser_Id(uuid);
         userRepository.delete(user);
     }
@@ -110,21 +105,17 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserDto getUserById(String userId) {
         return mapToDto(userRepository.findById(UserHelper.parseUUID(userId))
-                .orElseThrow(() -> new ResourceNotFoundException("User not found")));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId)));
     }
 
     @Override
-    @Transactional
     public List<UserDto> getAllUsers() {
-        // FIX: Removed .peek() - @EntityGraph in UserRepository.findAll() handles this
-        return userRepository.findAll().stream()
-                .map(this::mapToDto)
-                .collect(Collectors.toList());
+        return userRepository.findAll().stream().map(this::mapToDto).collect(Collectors.toList());
     }
 
     private UserDto mapToDto(User user) {
         UserDto dto = modelMapper.map(user, UserDto.class);
-        dto.setPassword(null);
+        dto.setPassword(null); // Ensure password never leaves the service layer in DTOs
         return dto;
     }
 }

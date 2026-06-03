@@ -44,7 +44,6 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
     @Override
     @Transactional
-
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
         if (response.isCommitted()) return;
 
@@ -58,30 +57,35 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         List<RefreshToken> activeTokens = refreshTokenRepo.findByUserAndRevokedFalseOrderByCreatedAtDesc(userEntity);
 
         String refreshToken;
+        long ttl = jwtService.getRefreshTtlSeconds(); // Get TTL from JwtService
+
         if (!activeTokens.isEmpty()) {
-            // Pick the most recent one
             RefreshToken activeToken = activeTokens.get(0);
             refreshToken = jwtService.generateRefreshToken(userEntity, activeToken.getJti());
             logger.info("Reusing existing session for user: {}", userEntity.getEmail());
         } else {
-            // Create a new one
             refreshToken = createNewSession(userEntity);
             logger.info("Created new session for user: {}", userEntity.getEmail());
         }
 
-        // --- Update Redis Cache ---
+        // --- Update Redis Cache with TTL ---
         try {
             String hashedToken = DigestUtils.sha256Hex(refreshToken);
+
+            // Sync with Redis using the new builder structure that supports TTL
             redisRepo.save(RefreshTokenRedis.builder()
                     .tokenHash(hashedToken)
                     .userId(userEntity.getId().toString())
-                    .expiryDate(Instant.now().plusSeconds(jwtService.getRefreshTtlSeconds()).getEpochSecond())
+                    .expiryDate(Instant.now().plusSeconds(ttl).getEpochSecond())
+                    .ttl(ttl) // This maps to the @TimeToLive field in your Redis entity
                     .build());
+
+            logger.info("Successfully cached refresh token in Redis for user: {}", userEntity.getEmail());
         } catch (Exception e) {
             logger.error("Redis unreachable, skipping cache update: {}", e.getMessage());
         }
 
-        cookieService.attachRefreshCookie(response, refreshToken, (int) jwtService.getRefreshTtlSeconds());
+        cookieService.attachRefreshCookie(response, refreshToken, (int) ttl);
         response.sendRedirect(frontendSuccessUrl);
     }
     private String createNewSession(User user) {

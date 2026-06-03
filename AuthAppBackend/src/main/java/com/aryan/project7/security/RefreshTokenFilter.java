@@ -34,7 +34,7 @@ public class RefreshTokenFilter extends OncePerRequestFilter {
 
         logger.info("FILTER CHECK: Request URI: {}", request.getRequestURI());
 
-        String refreshToken = cookieService.getRefreshCookie(request);
+        String refreshToken = cookieService.getRefreshTokenFromCookie(request);
 
         if (refreshToken == null || refreshToken.isEmpty()) {
             filterChain.doFilter(request, response);

@@ -58,9 +58,15 @@ public class GlobalExceptionHandler {
     // Unifies General/Illegal Arguments
     @ExceptionHandler({IllegalArgumentException.class, Exception.class})
     public ResponseEntity<ApiError> handleGeneral(Exception ex, HttpServletRequest request) {
+        if (!(ex instanceof IllegalArgumentException)) {
+            logger.error("Internal Server Error: ", ex); // Log the full stack trace for 500 errors
+        }
+
         HttpStatus status = (ex instanceof IllegalArgumentException) ? HttpStatus.BAD_REQUEST : HttpStatus.INTERNAL_SERVER_ERROR;
+        String title = (ex instanceof IllegalArgumentException) ? "Invalid Request" : "Internal Server Error";
+
         return ResponseEntity.status(status).body(
-                ApiError.of(status.value(), "Server Error", ex.getMessage(), request.getRequestURI(), false)
+                ApiError.of(status.value(), title, ex.getMessage(), request.getRequestURI(), false)
         );
     }
 
@@ -74,6 +80,13 @@ public class GlobalExceptionHandler {
                         request.getRequestURI(),
                         false
                 )
+        );
+    }
+
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<ApiError> handleAccessDenied(Exception ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                ApiError.of(HttpStatus.FORBIDDEN.value(), "Forbidden", "You do not have permission to access this resource", request.getRequestURI(), false)
         );
     }
 }

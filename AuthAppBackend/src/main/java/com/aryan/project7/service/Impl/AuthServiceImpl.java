@@ -14,18 +14,17 @@ public class AuthServiceImpl implements AuthService {
     private final UserService userService;
     private final PasswordEncoder passwordEncoder;
 
-    // This handles the logic for a brand-new user signing up
     @Override
     public UserDto registerUser(UserDto userDto) {
+        // Strict validation: Prevent empty passwords from reaching the DB
+        if (userDto.getPassword() == null || userDto.getPassword().isBlank()) {
+            throw new IllegalArgumentException("Registration failed: Password cannot be blank.");
+        }
 
-        // Security 101: Never store plain-text passwords.
-        // We hash it here before it ever gets near the database.
-        String encodedPassword = passwordEncoder.encode(userDto.getPassword());
-        userDto.setPassword(encodedPassword);
+        // Hash before processing
+        userDto.setPassword(passwordEncoder.encode(userDto.getPassword()));
 
-        // Now that the password is safe, we hand it off to the regular user service to save it
+        // Save via UserService
         return userService.createUser(userDto);
     }
-    //This method nulls the hashed password before sending dtos through endpoints
-
 }

@@ -82,7 +82,8 @@ public class CookieService {
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
         response.setHeader("Pragma", "no-cache");
     }
-    public String getRefreshCookie(HttpServletRequest request) {
+
+    public String getRefreshTokenFromCookie(HttpServletRequest request) {
         if (request.getCookies() != null) {
             for (jakarta.servlet.http.Cookie cookie : request.getCookies()) {
                 if (refreshTokenCookieName.equals(cookie.getName())) {

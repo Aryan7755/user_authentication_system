@@ -110,4 +110,5 @@ public class JwtService {
     public String getJti(String token) {
         return parse(token).getId();
     }
+
 }
